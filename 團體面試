@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KEYENCE 校園大使 團體面試場次</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft JhengHei', sans-serif; background: #f0f4f8; min-height: 100vh; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #1a1a2e, #16213e); color: white; padding: 40px; text-align: center; }
+        .header h1 { font-size: 28px; margin-bottom: 8px; }
+        .header p { opacity: 0.8; font-size: 14px; }
+        .content { padding: 40px; }
+        .section-title { font-size: 18px; font-weight: bold; color: #1a1a2e; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #e2e8f0; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 6px; font-weight: 600; color: #374151; font-size: 14px; }
+        input { width: 100%; padding: 12px 16px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 15px; transition: border-color 0.3s; font-family: inherit; }
+        input:focus { outline: none; border-color: #1a1a2e; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+        /* 月份摺疊 */
+        .month-group { margin-bottom: 16px; border: 2px solid #e2e8f0; border-radius: 10px; overflow: hidden; }
+        .month-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 14px 20px; background: #1a1a2e; color: white;
+            cursor: pointer; font-weight: bold; font-size: 16px;
+            user-select: none;
+        }
+        .month-header:hover { background: #16213e; }
+        .month-arrow { transition: transform 0.3s; font-size: 12px; }
+        .month-header.open .month-arrow { transform: rotate(180deg); }
+        .month-body { display: none; padding: 16px; }
+        .month-body.open { display: block; }
+
+        /* 場次卡片 */
+        .slots-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+        .slot-card { border: 2px solid #e2e8f0; border-radius: 10px; padding: 14px; cursor: pointer; transition: all 0.3s; }
+        .slot-card:hover:not(.taken):not(.selected) { border-color: #1a1a2e; background: #f8fafc; transform: translateY(-2px); }
+        .slot-card.selected { border-color: #1a1a2e; background: #1a1a2e; color: white; }
+        .slot-card.taken { background: #f1f5f9; cursor: not-allowed; opacity: 0.55; }
+        .slot-date { font-weight: bold; font-size: 14px; margin-bottom: 4px; }
+        .slot-time { font-size: 13px; opacity: 0.85; }
+        .slot-status { font-size: 12px; margin-top: 8px; font-weight: 600; }
+        .slot-card:not(.taken):not(.selected) .slot-status { color: #22c55e; }
+        .slot-card.taken .slot-status { color: #ef4444; }
+        .slot-card.selected .slot-status { color: #86efac; }
+
+        .submit-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #1a1a2e, #16213e); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 30px; transition: opacity 0.3s; font-family: inherit; letter-spacing: 1px; }
+        .submit-btn:hover { opacity: 0.88; }
+        .submit-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .error-message { background: #fef2f2; border: 2px solid #ef4444; border-radius: 8px; padding: 12px 16px; color: #dc2626; font-size: 14px; margin-top: 14px; display: none; }
+        .success-message { display: none; background: #f0fdf4; border: 2px solid #22c55e; border-radius: 12px; padding: 32px; text-align: center; }
+        .success-message h3 { color: #16a34a; font-size: 22px; margin-bottom: 10px; }
+        .loading { text-align: center; padding: 40px; color: #6b7280; }
+        .spinner { border: 3px solid #e2e8f0; border-top: 3px solid #1a1a2e; border-radius: 50%; width: 32px; height: 32px; animation: spin 0.9s linear infinite; margin: 0 auto 12px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .required { color: #ef4444; }
+        .hint { font-size: 13px; color: #6b7280; margin-bottom: 16px; }
+        @media (max-width: 600px) { .content { padding: 20px; } .form-row { grid-template-columns: 1fr; } .header { padding: 24px; } .header h1 { font-size: 22px; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>🎓 KEYENCE 校園大使 團體面試申請</h1>
+        <p>請填寫個人資料並選擇面試場次（每場次最多可容納 5 人）</p>
+    </div>
+
+    <div class="content">
+        <div id="loadingSlots" class="loading">
+            <div class="spinner"></div>
+            載入場次中，請稍候...
+        </div>
+
+        <div id="mainForm" style="display:none">
+
+            <div class="section-title">📋 個人資料</div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>姓名 <span class="required">*</span></label>
+                    <input type="text" id="name" placeholder="請輸入姓名">
+                </div>
+                <div class="form-group">
+                    <label>Email <span class="required">*</span></label>
+                    <input type="email" id="email" placeholder="請輸入 Email">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>電話 <span class="required">*</span></label>
+                    <input type="tel" id="phone" placeholder="請輸入手機號碼">
+                </div>
+                <div class="form-group">
+                    <label>學校 / 系所 <span class="required">*</span></label>
+                    <input type="text" id="school" placeholder="例：台灣大學 / 資訊工程學系">
+                </div>
+            </div>
+
+            <div class="section-title" style="margin-top:32px">📅 選擇面試場次</div>
+            <p class="hint">點擊月份展開場次，每個場次最多可容納 5 人，滿額後會顯示灰色</p>
+
+            <!-- 月份摺疊區塊 -->
+            <div id="slotsContainer"></div>
+
+            <div class="error-message" id="errorMessage"></div>
+
+            <button class="submit-btn" id="submitBtn" onclick="submitForm()">
+                確認送出申請 →
+            </button>
+        </div>
+
+        <div class="success-message" id="successMessage">
+            <h3>✅ 申請成功！</h3>
+            <p id="successDetail" style="color:#374151; font-size:16px"></p>
+            <p style="margin-top:10px; font-size:13px; color:#6b7280">請留意您的 Email，我們將寄送確認信給您</p>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import {
+        getFirestore, collection, doc, getDoc,
+        setDoc, onSnapshot, runTransaction, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyA3YaQpYWCOxDSDb4WovtmOZNeX_q7Zx4c",
+        authDomain: "campus-d0457.firebaseapp.com",
+        projectId: "campus-d0457",
+        storageBucket: "campus-d0457.firebasestorage.app",
+        messagingSenderId: "744715887195",
+        appId: "1:744715887195:web:db14a7d329ef915ff3d57e"
+    };
+
+    // ✅ 每場次容量固定 5 人
+    const CAPACITY = 5;
+
+    // ✅ 團體面試時段（你可自行修改）
+    const SLOTS = [
+        { id: "gslot_0930_1", date: "9/30 (二)",  time: "11:00 - 12:00" },
+        { id: "gslot_0930_2", date: "9/30 (二)",  time: "15:00 - 16:00" },
+
+        { id: "gslot_1005_1", date: "10/5 (日)",  time: "11:00 - 12:00" },
+
+        { id: "gslot_1012_1", date: "10/12 (日)", time: "11:00 - 12:00" },
+        { id: "gslot_1012_2", date: "10/12 (日)", time: "15:00 - 16:00" },
+    ];
+
+    const MONTHS = [
+        { label: "📅 9月場次", prefix: "9/" },
+        { label: "📅 10月場次", prefix: "10/" },
+    ];
+
+    // ✅ 使用獨立的 Collection 名稱，不會跟個人面試的 slots / applications 混在一起
+    const SLOTS_COLLECTION = "group_slots";
+    const APPLICATIONS_COLLECTION = "group_applications";
+
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+
+    let selectedSlot = null;
+    // slotId -> { count, capacity }
+    let slotStatus = new Map();
+
+    async function initSlots() {
+        for (const slot of SLOTS) {
+            const slotRef = doc(db, SLOTS_COLLECTION, slot.id);
+            const slotSnap = await getDoc(slotRef);
+            // ⚠️ 只有文件不存在時才建立，已存在的資料不會被覆寫或重置
+            if (!slotSnap.exists()) {
+                await setDoc(slotRef, {
+                    date: slot.date, time: slot.time,
+                    capacity: CAPACITY, count: 0
+                });
+            }
+        }
+    }
+
+    function listenSlots() {
+        onSnapshot(collection(db, SLOTS_COLLECTION), (snapshot) => {
+            slotStatus.clear();
+            snapshot.forEach((d) => {
+                const data = d.data();
+                slotStatus.set(d.id, {
+                    count: data.count || 0,
+                    capacity: data.capacity || CAPACITY
+                });
+            });
+            renderSlots();
+        });
+    }
+
+    function renderSlots() {
+        const container = document.getElementById("slotsContainer");
+        container.innerHTML = "";
+
+        MONTHS.forEach((month, idx) => {
+            const monthSlots = SLOTS.filter(s => s.date.startsWith(month.prefix));
+            if (monthSlots.length === 0) return;
+
+            const group = document.createElement("div");
+            group.className = "month-group";
+
+            const availableCount = monthSlots.filter(s => {
+                const st = slotStatus.get(s.id);
+                return !st || st.count < st.capacity;
+            }).length;
+
+            const header = document.createElement("div");
+            header.className = "month-header" + (idx === 0 ? " open" : "");
+            header.innerHTML = `
+                <span>${month.label}　<span style="font-size:13px;opacity:0.75;">尚有名額場次 ${availableCount} 個</span></span>
+                <span class="month-arrow">▼</span>
+            `;
+
+            const body = document.createElement("div");
+            body.className = "month-body" + (idx === 0 ? " open" : "");
+
+            const grid = document.createElement("div");
+            grid.className = "slots-grid";
+
+            monthSlots.forEach(slot => {
+                const st = slotStatus.get(slot.id) || { count: 0, capacity: CAPACITY };
+                const remaining = st.capacity - st.count;
+                const isFull     = remaining <= 0;
+                const isSelected = selectedSlot === slot.id;
+
+                const card = document.createElement("div");
+                card.className = `slot-card ${isFull ? "taken" : ""} ${isSelected ? "selected" : ""}`;
+                card.innerHTML = `
+                    <div class="slot-date">📅 ${slot.date}</div>
+                    <div class="slot-time">🕐 ${slot.time}</div>
+                    <div class="slot-status">
+                        ${isFull ? "❌ 名額已滿 (5/5)" : isSelected ? `✓ 已選擇（剩 ${remaining} 位）` : `✅ 尚有 ${remaining} 位名額`}
+                    </div>`;
+                if (!isFull) card.onclick = () => { selectedSlot = slot.id; renderSlots(); };
+                grid.appendChild(card);
+            });
+
+            header.onclick = () => {
+                header.classList.toggle("open");
+                body.classList.toggle("open");
+            };
+
+            body.appendChild(grid);
+            group.appendChild(header);
+            group.appendChild(body);
+            container.appendChild(group);
+        });
+    }
+
+    async function submitForm() {
+        const name  = document.getElementById("name").value.trim();
+        const email = document.getElementById("email").value.trim();
+        const phone = document.getElementById("phone").value.trim();
+        const school = document.getElementById("school").value.trim();
+
+        if (!name || !email || !phone || !school)
+            return showError("⚠️ 請填寫所有必填欄位");
+        if (!email.includes("@"))
+            return showError("⚠️ 請輸入有效的 Email");
+        if (!selectedSlot)
+            return showError("⚠️ 請選擇一個面試場次");
+
+        const btn = document.getElementById("submitBtn");
+        btn.disabled = true;
+        btn.textContent = "送出中...";
+
+        try {
+            const slotRef = doc(db, SLOTS_COLLECTION, selectedSlot);
+            const appRef  = doc(collection(db, APPLICATIONS_COLLECTION));
+
+            await runTransaction(db, async (tx) => {
+                const slotSnap = await tx.get(slotRef);
+                const data = slotSnap.data();
+                const capacity = data.capacity || CAPACITY;
+                const count = data.count || 0;
+
+                if (count >= capacity) throw new Error("此場次名額已滿，請選擇其他場次");
+
+                tx.update(slotRef, { count: count + 1 });
+                tx.set(appRef, {
+                    name, email, phone, school,
+                    slotId: selectedSlot,
+                    submittedAt: serverTimestamp()
+                });
+            });
+
+            const slot = SLOTS.find(s => s.id === selectedSlot);
+            document.getElementById("mainForm").style.display = "none";
+            document.getElementById("successMessage").style.display = "block";
+            document.getElementById("successDetail").textContent =
+                `${name} 您好！您已成功預約 ${slot.date} ${slot.time} 的面試`;
+
+        } catch (err) {
+            showError("❌ " + (err.message || "送出失敗，請稍後再試"));
+            btn.disabled = false;
+            btn.textContent = "確認送出申請 →";
+        }
+    }
+
+    function showError(msg) {
+        const el = document.getElementById("errorMessage");
+        el.textContent = msg;
+        el.style.display = "block";
+        setTimeout(() => el.style.display = "none", 4000);
+    }
+
+    window.submitForm = submitForm;
+
+    (async () => {
+        await initSlots();
+        listenSlots();
+        document.getElementById("loadingSlots").style.display = "none";
+        document.getElementById("mainForm").style.display = "block";
+    })();
+</script>
+</body>
+</html>
