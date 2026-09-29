@@ -125,7 +125,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import {
         getFirestore, collection, doc, getDoc,
-        setDoc, onSnapshot, runTransaction, serverTimestamp
+        setDoc, updateDoc, onSnapshot, runTransaction, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -140,15 +140,15 @@
     // ✅ 每場次容量固定 5 人
     const CAPACITY = 5;
 
-    // ✅ 團體面試時段（你可自行修改）
+    // ✅ 團體面試時段（星期已修正：9/30 三、10/5 一、10/12 一）
     const SLOTS = [
-        { id: "gslot_0930_1", date: "9/30 (二)",  time: "11:00 - 12:00" },
-        { id: "gslot_0930_2", date: "9/30 (二)",  time: "15:00 - 16:00" },
+        { id: "gslot_0930_1", date: "9/30 (三)",  time: "11:00 - 12:00" },
+        { id: "gslot_0930_2", date: "9/30 (三)",  time: "15:00 - 16:00" },
 
-        { id: "gslot_1005_1", date: "10/5 (日)",  time: "11:00 - 12:00" },
+        { id: "gslot_1005_1", date: "10/5 (一)",  time: "11:00 - 12:00" },
 
-        { id: "gslot_1012_1", date: "10/12 (日)", time: "11:00 - 12:00" },
-        { id: "gslot_1012_2", date: "10/12 (日)", time: "15:00 - 16:00" },
+        { id: "gslot_1012_1", date: "10/12 (一)", time: "11:00 - 12:00" },
+        { id: "gslot_1012_2", date: "10/12 (一)", time: "15:00 - 16:00" },
     ];
 
     const MONTHS = [
@@ -171,12 +171,23 @@
         for (const slot of SLOTS) {
             const slotRef = doc(db, SLOTS_COLLECTION, slot.id);
             const slotSnap = await getDoc(slotRef);
-            // ⚠️ 只有文件不存在時才建立，已存在的資料不會被覆寫或重置
+
             if (!slotSnap.exists()) {
+                // 文件不存在 → 全新建立
                 await setDoc(slotRef, {
                     date: slot.date, time: slot.time,
                     capacity: CAPACITY, count: 0
                 });
+            } else {
+                // ⚠️ 文件已存在 → 只修正顯示用的 date / time 文字
+                // 完全不會動到 count（已報名人數），保護已填資料的人
+                const data = slotSnap.data();
+                if (data.date !== slot.date || data.time !== slot.time) {
+                    await updateDoc(slotRef, {
+                        date: slot.date,
+                        time: slot.time
+                    });
+                }
             }
         }
     }
