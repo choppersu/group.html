@@ -143,16 +143,25 @@
     // ✅ 團體面試時段
     // 10/6 之前的場次（9/30、10/5）已從頁面移除；
     // Firestore 中的場次文件與報名資料都保留不動，只是不再顯示。
+    // start：場次開始時間，時間一到會自動反灰「已截止」
+    // closed: true：手動關閉場次
     const SLOTS = [
-        { id: "gslot_1012_1", date: "10/12 (一)", time: "11:00 - 12:00" },
-        { id: "gslot_1012_2", date: "10/12 (一)", time: "14:00 - 15:00" },
+        { id: "gslot_1012_1", date: "10/12 (一)", time: "11:00 - 12:00", start: "2026-10-12T11:00:00+08:00" },
+        { id: "gslot_1012_2", date: "10/12 (一)", time: "14:00 - 15:00", start: "2026-10-12T14:00:00+08:00", closed: true },
 
-        { id: "gslot_1013_1", date: "10/13 (二)", time: "10:00 - 11:00" },
+        { id: "gslot_1013_1", date: "10/13 (二)", time: "10:00 - 11:00", start: "2026-10-13T10:00:00+08:00" },
 
-        { id: "gslot_1019_1", date: "10/19 (一)", time: "16:00 - 17:00" },
+        { id: "gslot_1019_1", date: "10/19 (一)", time: "16:00 - 17:00", start: "2026-10-19T16:00:00+08:00" },
 
-        { id: "gslot_1021_1", date: "10/21 (三)", time: "10:00 - 11:00" },
+        { id: "gslot_1020_1", date: "10/20 (二)", time: "11:00 - 12:00", start: "2026-10-20T11:00:00+08:00" },
+        { id: "gslot_1020_2", date: "10/20 (二)", time: "16:00 - 17:00", start: "2026-10-20T16:00:00+08:00" },
+
+        { id: "gslot_1021_1", date: "10/21 (三)", time: "10:00 - 11:00", start: "2026-10-21T10:00:00+08:00" },
     ];
+
+    function isClosed(slot) {
+        return !!slot.closed || new Date() >= new Date(slot.start);
+    }
 
     const MONTHS = [
         { label: "📅 10月場次", prefix: "10/" },
@@ -221,7 +230,7 @@
 
             const availableCount = monthSlots.filter(s => {
                 const st = slotStatus.get(s.id);
-                return !st || st.count < st.capacity;
+                return !isClosed(s) && (!st || st.count < st.capacity);
             }).length;
 
             const header = document.createElement("div");
@@ -241,17 +250,20 @@
                 const st = slotStatus.get(slot.id) || { count: 0, capacity: CAPACITY };
                 const remaining = st.capacity - st.count;
                 const isFull     = remaining <= 0;
+                const closed     = isClosed(slot);
+                const disabled   = isFull || closed;
+                if (disabled && selectedSlot === slot.id) selectedSlot = null;
                 const isSelected = selectedSlot === slot.id;
 
                 const card = document.createElement("div");
-                card.className = `slot-card ${isFull ? "taken" : ""} ${isSelected ? "selected" : ""}`;
+                card.className = `slot-card ${disabled ? "taken" : ""} ${isSelected ? "selected" : ""}`;
                 card.innerHTML = `
                     <div class="slot-date">📅 ${slot.date}</div>
                     <div class="slot-time">🕐 ${slot.time}</div>
                     <div class="slot-status">
-                        ${isFull ? "❌ 名額已滿 (5/5)" : isSelected ? `✓ 已選擇（剩 ${remaining} 位）` : `✅ 尚有 ${remaining} 位名額`}
+                        ${closed ? "⛔ 已截止" : isFull ? "❌ 名額已滿 (5/5)" : isSelected ? `✓ 已選擇（剩 ${remaining} 位）` : `✅ 尚有 ${remaining} 位名額`}
                     </div>`;
-                if (!isFull) card.onclick = () => { selectedSlot = slot.id; renderSlots(); };
+                if (!disabled) card.onclick = () => { selectedSlot = slot.id; renderSlots(); };
                 grid.appendChild(card);
             });
 
@@ -279,6 +291,11 @@
             return showError("⚠️ 請輸入有效的 Email");
         if (!selectedSlot)
             return showError("⚠️ 請選擇一個面試場次");
+        if (isClosed(SLOTS.find(s => s.id === selectedSlot))) {
+            selectedSlot = null;
+            renderSlots();
+            return showError("⚠️ 此場次已截止，請選擇其他場次");
+        }
 
         const btn = document.getElementById("submitBtn");
         btn.disabled = true;
